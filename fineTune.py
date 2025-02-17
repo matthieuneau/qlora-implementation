@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from datasets import load_dataset
 from transformers import (
     DataCollatorForSeq2Seq,
@@ -9,9 +10,26 @@ from transformers import (
 )
 
 model_id = "meta-llama/Llama-3.2-1B"
-model = AutoModelForCausalLM.from_pretrained(
+base_model = AutoModelForCausalLM.from_pretrained(
     model_id, torch_dtype=torch.bfloat16, device_map="auto"
 )
+
+
+class CustomLlamaQA(nn.Module):
+    def __init__(self, base_model):
+        super().__init__()
+        self.base_model = base_model
+        self.qa_outputs = nn.Linear(base_model.config.hidden_size, 2)
+
+    def forward(self, input_ids, attention_mask=None):
+        outputs = self.base_model(input_ids, attention_mask=attention_mask)
+        logits = self.qa_outputs(outputs.last_hidden_state)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        return start_logits.squeeze(-1), end_logits.squeeze(-1)
+
+
+model = CustomLlamaQA(base_model)
+
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
@@ -71,7 +89,7 @@ val_dataset = val_dataset.remove_columns(
 train_dataset.set_format("torch")
 val_dataset.set_format("torch")
 
-# print(train_dataset[0])
+print("ok")
 
 training_args = TrainingArguments(
     output_dir="./llama-qa-finetuned",
