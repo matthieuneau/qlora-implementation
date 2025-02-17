@@ -20,36 +20,58 @@ train_dataset = load_dataset("squad_v2", split="train[:1%]")
 val_dataset = load_dataset("squad_v2", split="validation[:1%]")
 
 
-def format_example(example):
-    question = example["question"]
-    context = example["context"]
-
-    # Some questions in SQuAD v2 are unanswerable, so we handle them.
-    answer = (
-        example["answers"]["text"][0] if example["answers"]["text"] else "No answer."
-    )
-
-    return {"text": f"Question: {question}\nContext: {context}\nAnswer: {answer}"}
-
-
 def tokenize(example):
-    return tokenizer(
-        example["text"], truncation=True, padding="max_length", max_length=512
+    tokenized = tokenizer(
+        example["question"],
+        example["context"],
+        truncation="only_second",
+        padding="max_length",
+        max_length=512,
+        return_offsets_mapping=True,
     )
 
+    try:
+        answer = example["answers"]["text"][0] if example["answers"]["text"] else None
+        answer_start = (
+            example["answers"]["answer_start"][0]
+            if example["answers"]["answer_start"]
+            else None
+        )
 
-train_dataset = train_dataset.map(format_example)
-val_dataset = val_dataset.map(format_example)
-train_dataset = train_dataset.map(tokenize, batched=True)
-val_dataset = val_dataset.map(tokenize, batched=True)
+        # Initialize labels as -100 (ignored in loss calculation)
+        tokenized["start_positions"] = -100
+        tokenized["end_positions"] = -100
+
+        if answer:
+            char_to_token_map = tokenized["offset_mapping"]
+            for idx, (start, end) in enumerate(char_to_token_map):
+                if start <= answer_start < end:
+                    tokenized["start_positions"] = idx
+                if start < answer_start + len(answer) <= end:
+                    tokenized["end_positions"] = idx
+
+        tokenized.pop("offset_mapping")  # Not needed for training
+
+    except Exception as e:
+        print("exception raised", e)
+        print("problematic example", example["id"])
+
+    return tokenized
+
+
+# TODO: Fix the tokenize function so that it works with batched=False
+train_dataset = train_dataset.map(tokenize, batched=False)
+val_dataset = val_dataset.map(tokenize, batched=False)
 train_dataset = train_dataset.remove_columns(
-    ["text", "question", "context", "answers", "id", "title"]
+    ["question", "context", "answers", "id", "title"]
 )
 val_dataset = val_dataset.remove_columns(
-    ["text", "question", "context", "answers", "id", "title"]
+    ["context", "question", "answers", "id", "title"]
 )
 train_dataset.set_format("torch")
 val_dataset.set_format("torch")
+
+# print(train_dataset[0])
 
 training_args = TrainingArguments(
     output_dir="./llama-qa-finetuned",
@@ -57,7 +79,7 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=4,
     gradient_accumulation_steps=8,
     save_strategy="epoch",
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     learning_rate=2e-5,
     num_train_epochs=1,
     weight_decay=0.01,
@@ -76,8 +98,8 @@ trainer = Trainer(
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=val_dataset,
-    tokenizer=tokenizer,
+    processing_class=tokenizer,
     data_collator=data_collator,
 )
 
-print("no runtime err")
+trainer.train()
