@@ -1,4 +1,5 @@
 import torch
+
 import torch.nn as nn
 from datasets import load_dataset
 from transformers import (
@@ -11,7 +12,7 @@ from transformers import (
 
 model_id = "meta-llama/Llama-3.2-1B"
 base_model = AutoModelForCausalLM.from_pretrained(
-    model_id, torch_dtype=torch.bfloat16, device_map="auto"
+    model_id, torch_dtype=torch.bfloat16, device_map=0
 )
 
 
@@ -19,11 +20,16 @@ class CustomLlamaQA(nn.Module):
     def __init__(self, base_model):
         super().__init__()
         self.base_model = base_model
-        self.qa_outputs = nn.Linear(base_model.config.hidden_size, 2)
+        self.qa_outputs = nn.Linear(
+            base_model.config.hidden_size, 2, dtype=torch.bfloat16
+        )
 
     def forward(self, input_ids, attention_mask=None, labels=None):
-        outputs = self.base_model(input_ids, attention_mask=attention_mask)
-        logits = self.qa_outputs(outputs.last_hidden_state)
+        outputs = self.base_model(
+            input_ids, attention_mask=attention_mask, output_hidden_states=True
+        )
+        hidden_states = outputs.hidden_states[-1]  # Extract the last hidden_state
+        logits = self.qa_outputs(hidden_states)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits, end_logits = start_logits.squeeze(-1), end_logits.squeeze(-1)
 
@@ -34,6 +40,8 @@ class CustomLlamaQA(nn.Module):
             start_loss = loss_fct(start_logits, start_positions)
             end_loss = loss_fct(end_logits, end_positions)
             loss = (start_loss + end_loss) / 2
+        else:
+            loss = torch.tensor(0.0, device=input_ids.device, dtype=start_logits.dtype)
 
         return {"loss": loss, "start_logits": start_logits, "end_logits": end_logits}
 
