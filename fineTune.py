@@ -21,11 +21,21 @@ class CustomLlamaQA(nn.Module):
         self.base_model = base_model
         self.qa_outputs = nn.Linear(base_model.config.hidden_size, 2)
 
-    def forward(self, input_ids, attention_mask=None):
+    def forward(self, input_ids, attention_mask=None, labels=None):
         outputs = self.base_model(input_ids, attention_mask=attention_mask)
         logits = self.qa_outputs(outputs.last_hidden_state)
         start_logits, end_logits = logits.split(1, dim=-1)
-        return start_logits.squeeze(-1), end_logits.squeeze(-1)
+        start_logits, end_logits = start_logits.squeeze(-1), end_logits.squeeze(-1)
+
+        loss = None
+        if labels is not None:
+            start_positions, end_positions = labels[:, 0], labels[:, 1]
+            loss_fct = nn.CrossEntropyLoss()
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            loss = (start_loss + end_loss) / 2
+
+        return {"loss": loss, "start_logits": start_logits, "end_logits": end_logits}
 
 
 model = CustomLlamaQA(base_model)
@@ -34,8 +44,8 @@ model = CustomLlamaQA(base_model)
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
 
-train_dataset = load_dataset("squad_v2", split="train[:1%]")
-val_dataset = load_dataset("squad_v2", split="validation[:1%]")
+train_dataset = load_dataset("squad_v2", split="train[:1]")
+val_dataset = load_dataset("squad_v2", split="validation[:1]")
 
 
 def tokenize(example):
@@ -89,7 +99,6 @@ val_dataset = val_dataset.remove_columns(
 train_dataset.set_format("torch")
 val_dataset.set_format("torch")
 
-print("ok")
 
 training_args = TrainingArguments(
     output_dir="./llama-qa-finetuned",
