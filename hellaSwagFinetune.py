@@ -76,7 +76,7 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     logging_dir="./logs",
     save_strategy="epoch",
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     fp16=True,  # Enable mixed precision for speedup
     num_train_epochs=3,
 )
