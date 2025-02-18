@@ -19,7 +19,10 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
 
-dataset = load_dataset("hellaswag", split="train[:100]", trust_remote_code=True)
+train_dataset = load_dataset("hellaswag", split="train[:100]", trust_remote_code=True)
+eval_dataset = load_dataset(
+    "hellaswag", split="validation[:100]", trust_remote_code=True
+)
 
 
 def preprocess_function(example):
@@ -51,16 +54,16 @@ def preprocess_function(example):
     }
 
 
-tokenized_dataset = dataset.map(preprocess_function, batched=False)
-tokenized_dataset = tokenized_dataset.select_columns(
-    ["input_ids", "attention_mask", "labels"]
-)
+train_dataset = train_dataset.map(preprocess_function, batched=False)
+train_dataset = train_dataset.select_columns(["input_ids", "attention_mask", "labels"])
+eval_dataset = eval_dataset.map(preprocess_function, batched=False)
+eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labels"])
 
-# print("tokenized dataset sample", tokenized_dataset[0])
+# print("tokenized dataset sample", train_dataset[0])
 
 # Data collator for efficient padding
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
-# dataloader = DataLoader(tokenized_dataset, batch_size=2, collate_fn=data_collator)
+# dataloader = DataLoader(train_dataset, batch_size=2, collate_fn=data_collator)
 # batch = next(iter(dataloader))
 #
 # print("processed dataset sample", batch)
@@ -81,7 +84,8 @@ training_args = TrainingArguments(
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=tokenized_dataset,
+    eval_dataset=eval_dataset,
+    train_dataset=train_dataset,
     processing_class=tokenizer,
     data_collator=data_collator,
 )
