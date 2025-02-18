@@ -56,11 +56,34 @@ tokenized_dataset = tokenized_dataset.select_columns(
     ["input_ids", "attention_mask", "labels"]
 )
 
-print("tokenized dataset sample", tokenized_dataset[0])
+# print("tokenized dataset sample", tokenized_dataset[0])
 
 # Data collator for efficient padding
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
-dataloader = DataLoader(tokenized_dataset, batch_size=2, collate_fn=data_collator)
-batch = next(iter(dataloader))
+# dataloader = DataLoader(tokenized_dataset, batch_size=2, collate_fn=data_collator)
+# batch = next(iter(dataloader))
+#
+# print("processed dataset sample", batch)
+#
+training_args = TrainingArguments(
+    output_dir="./results",
+    per_device_train_batch_size=8,
+    gradient_accumulation_steps=4,  # Adjust for GPU memory
+    learning_rate=2e-5,
+    weight_decay=0.01,
+    logging_dir="./logs",
+    save_strategy="epoch",
+    evaluation_strategy="epoch",
+    fp16=True,  # Enable mixed precision for speedup
+    num_train_epochs=3,
+)
 
-print("processed dataset sample", batch)
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_dataset,
+    processing_class=tokenizer,
+    data_collator=data_collator,
+)
+
+trainer.train()
