@@ -21,10 +21,8 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
 
-train_dataset = load_dataset("hellaswag", split="train[:100]", trust_remote_code=True)
-eval_dataset = load_dataset(
-    "hellaswag", split="validation[:100]", trust_remote_code=True
-)
+train_dataset = load_dataset("hellaswag", split="train", trust_remote_code=True)
+eval_dataset = load_dataset("hellaswag", split="validation", trust_remote_code=True)
 
 
 def preprocess_function(example):
