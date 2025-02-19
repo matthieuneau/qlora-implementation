@@ -102,5 +102,5 @@ trainer = Trainer(
 trainer.train()
 
 merged_model = model.merge_and_unload()
-merged_model.save_pretrained("./merged_lora_model")
-tokenizer.save_pretrained("./merged_lora_model")
+merged_model.save_pretrained("./results/merged_lora_model")
+tokenizer.save_pretrained("./results/merged_lora_model")
