@@ -82,7 +82,7 @@ training_args = TrainingArguments(
     logging_dir="./logs",
     save_strategy="epoch",
     save_total_limit=1,  # only save last epoch
-    evaluation_strategy="epoch",
+    eval_strategy="epoch",
     fp16=False,
     bf16=True,
     bf16_full_eval=True,
@@ -100,3 +100,7 @@ trainer = Trainer(
 )
 
 trainer.train()
+
+merged_model = model.merge_and_unload()
+merged_model.save_pretrained("./merged_lora_model")
+tokenizer.save_pretrained("./merged_lora_model")
