@@ -15,7 +15,7 @@ wandb.init(project="qlora")
 # model_id = "meta-llama/Llama-3.2-1B"
 model_id = "HuggingFaceTB/SmolLM2-135M"
 model = AutoModelForCausalLM.from_pretrained(
-    model_id, torch_dtype=torch.bfloat16, device_map={"": 1}
+    model_id, torch_dtype=torch.bfloat16, device_map=0
 )
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -79,8 +79,10 @@ training_args = TrainingArguments(
     logging_dir="./logs",
     save_strategy="epoch",
     eval_strategy="epoch",
-    fp16=True,  # Enable mixed precision for speedup
-    num_train_epochs=20,
+    fp16=False,
+    bf16=True,
+    bf16_full_eval=True,  # Ensure bf16 is used in evaluation
+    num_train_epochs=5,
     report_to="wandb",
 )
 
