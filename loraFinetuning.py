@@ -10,6 +10,8 @@ from transformers import (
 from peft import LoraConfig, get_peft_model
 import wandb
 
+wandb.init(project="qlora")
+
 model_id = "HuggingFaceTB/SmolLM2-135M"
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
@@ -73,7 +75,7 @@ data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
 
 training_args = TrainingArguments(
     output_dir="./results_lora",
-    per_device_train_batch_size=256,
+    per_device_train_batch_size=32,
     gradient_accumulation_steps=4,
     learning_rate=2e-4,  # Higher LR for LoRA
     weight_decay=0.01,
@@ -84,7 +86,7 @@ training_args = TrainingArguments(
     fp16=False,
     bf16=True,
     bf16_full_eval=True,
-    num_train_epochs=5,
+    num_train_epochs=3,
     report_to="wandb",
 )
 
