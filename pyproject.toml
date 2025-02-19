@@ -12,6 +12,7 @@ dependencies = [
   "evaluate[evaluator] (>=0.4.3,<0.5.0)",
   "datasets (>=3.3.0,<4.0.0)",
   "pytest (>=8.3.4,<9.0.0)",
+  "wandb (>=0.19.6,<0.20.0)",
 ]
 
 
