@@ -113,7 +113,7 @@ for epoch in range(num_train_epochs):
     optimizer.zero_grad()
 
     for step, batch in enumerate(train_loader):
+        print("batch", batch)
         batch = {k: v.to(device) for k, v in batch.items()}
-
-
-trainer.train()
+        print("batch", batch)
+        break

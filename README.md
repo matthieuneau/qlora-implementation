@@ -18,7 +18,7 @@ We chose one popular downstream task for simplicity.
 
 In every case, training was performed until convergence of the train loss
 
-The decision to quantize only the q and
+The decision to quantize only the q and v matrices is arbitrary but consistent with the experiments performed in the qlora paper
 
 ### Hyperparameter setting
 
@@ -68,8 +68,6 @@ The fine-tuned models were evaluated on **lm-harness-evaluation**, a framework t
 ## Results & Observations
 
 ![Graph Title](hellaswag-results.png)
-
-Key takeaways:
 
 - **Full fine-tuning** achieved the best accuracy but required the most memory.
 - **LoRA fine-tuning** performed similarly while using fewer resources.

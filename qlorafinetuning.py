@@ -140,5 +140,6 @@ trainer = Trainer(
 
 trainer.train()
 
-model.merge_and_unload()
-model.save_pretrained(config.get("output_dir", "./qlora"))
+merged_model = model.merge_and_unload()
+merged_model.save_pretrained("./results/qlora")
+tokenizer.save_pretrained("./results/qlora")
