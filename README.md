@@ -10,7 +10,21 @@ This project explores different fine-tuning approaches for the **HuggingFaceTB/S
 
 After fine-tuning, the models were evaluated using the **lm-harness-evaluation** benchmark to assess performance.
 
-This project was completed as part of a school assignment.
+## Methodology
+
+We chose to adopt a small model (135M) so as to be able to fully fine tune it as well and compare the results. The purpose of this study is not to achieve state of the art results but merely to check that lora and qlora do not deteriorate finetuning
+
+We chose one popular downstream task for simplicity.
+
+In every case, training was performed until convergence of the train loss
+
+The decision to quantize only the q and
+
+### Hyperparameter setting
+
+For consistency, we chose the same LoRA hyperparameters for LoRA and qLoRA finetuning, setting them to values used in the literature. Namely, the rank was set to 8 and alpha to 32.
+
+The other training hyperparameters were set according what the NVIDIA GeForce GTX 1080 Ti used for finetuning allowed us to do and what worked best.
 
 ## Dataset: HellaSwag
 
@@ -53,11 +67,7 @@ The fine-tuned models were evaluated on **lm-harness-evaluation**, a framework t
 
 ## Results & Observations
 
-| Fine-Tuning Method | Accuracy (%) | Perplexity | Memory Usage |
-| ------------------ | ------------ | ---------- | ------------ |
-| Full Fine-Tuning   | XX%          | XX.X       | High         |
-| LoRA Fine-Tuning   | XX%          | XX.X       | Medium       |
-| QLoRA Fine-Tuning  | XX%          | XX.X       | Low          |
+![Graph Title](hellaswag-results.png)
 
 Key takeaways:
 
@@ -67,19 +77,16 @@ Key takeaways:
 
 ## Conclusion
 
-This experiment demonstrated that **LoRA and QLoRA** provide viable alternatives to full fine-tuning, enabling efficient adaptation of LLMs with minimal resource consumption.
+Overall, a full finetuning of the SmolLM2-135M model can improve the result by over 1pt on the benchmark, which is roughly what one should expect from a model of this size.
 
-QLoRA, in particular, allows fine-tuning large models on consumer hardware while maintaining competitive performance.
-
-## Future Work
-
-- Extend fine-tuning to larger models.
-- Experiment with different datasets.
-- Explore advanced LoRA configurations for better efficiency.
+LoRA finetuning yielded similar results
 
 ## References
 
 - Hugging Face Transformers: <https://huggingface.co/docs/transformers>
 - HellaSwag Dataset: <https://rowanzellers.com/hellaswag/>
+- lm-harness-evaluation library: <https://github.com/EleutherAI/lm-evaluation-harness/tree/main#model-apis-and-inference-servers>
+- SmolLM2 model card: <https://huggingface.co/HuggingFaceTB/SmolLM2-135M>
+
 - LoRA Paper: <https://arxiv.org/abs/2106.09685>
 - QLoRA Paper: <https://arxiv.org/abs/2305.14314>
