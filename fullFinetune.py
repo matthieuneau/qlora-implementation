@@ -1,17 +1,25 @@
 import torch
+import yaml
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     DataCollatorForSeq2Seq,
     Trainer,
-    TrainingArguments,
     TrainerCallback,
+    TrainingArguments,
 )
 
 import wandb
 
 wandb.init(project="qlora")
+
+config_file = "config.yaml"
+try:
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+except FileNotFoundError:
+    config = {}
 
 # model_id = "meta-llama/Llama-3.2-1B"
 model_id = "HuggingFaceTB/SmolLM2-135M"
@@ -22,10 +30,10 @@ model = AutoModelForCausalLM.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
 
-train_dataset = load_dataset("hellaswag", split="train[:100]", trust_remote_code=True)
-eval_dataset = load_dataset(
-    "hellaswag", split="validation[:100]", trust_remote_code=True
-)
+train_split = config.get("train_split", "train[:100]")
+eval_split = config.get("eval_split", "validation[:100]")
+train_dataset = load_dataset("hellaswag", split=train_split, trust_remote_code=True)
+eval_dataset = load_dataset("hellaswag", split=eval_split, trust_remote_code=True)
 
 
 def preprocess_function(example):
@@ -64,27 +72,21 @@ eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labe
 
 # print("tokenized dataset sample", train_dataset[0])
 
-# Data collator for efficient padding
-data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
-# dataloader = DataLoader(train_dataset, batch_size=2, collate_fn=data_collator)
-# batch = next(iter(dataloader))
-#
-# print("processed dataset sample", batch)
-#
+# Load training arguments from config or use defaults
 training_args = TrainingArguments(
-    output_dir="./results",
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,  # Adjust for GPU memory
-    learning_rate=2e-5,
-    weight_decay=0.01,
-    logging_dir="./logs",
-    save_strategy="epoch",
-    eval_strategy="epoch",
-    fp16=False,
-    bf16=True,
-    bf16_full_eval=True,  # Ensure bf16 is used in evaluation
-    num_train_epochs=5,
-    report_to="wandb",
+    output_dir=config.get("output_dir", "./results"),
+    per_device_train_batch_size=config.get("batch_size", 1),
+    gradient_accumulation_steps=config.get("gradient_accumulation_steps", 4),
+    learning_rate=config.get("learning_rate", 2e-5),
+    weight_decay=config.get("weight_decay", 0.01),
+    logging_dir=config.get("logging_dir", "./logs"),
+    save_strategy=config.get("save_strategy", "epoch"),
+    eval_strategy=config.get("eval_strategy", "epoch"),
+    fp16=config.get("fp16", False),
+    bf16=config.get("bf16", True),
+    bf16_full_eval=config.get("bf16_full_eval", True),
+    num_train_epochs=config.get("num_train_epochs", 5),
+    report_to=config.get("report_to", "wandb"),
 )
 
 
@@ -106,5 +108,9 @@ trainer = Trainer(
     data_collator=data_collator,
     callbacks=[MemoryUsageCallback()],
 )
+
+allocated = torch.cuda.memory_allocated() / 1e6  # Convert to MB
+reserved = torch.cuda.memory_reserved() / 1e6  # Convert to MB
+print(f"Allocated: {allocated:.2f} MB | Cached: {reserved:.2f} MB")
 
 trainer.train()
