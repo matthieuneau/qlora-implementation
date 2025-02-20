@@ -40,10 +40,10 @@ model = get_peft_model(model, lora_config)
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
 
-train_dataset = load_dataset("hellaswag", split="train[:1000]", trust_remote_code=True)
-eval_dataset = load_dataset(
-    "hellaswag", split="validation[:200]", trust_remote_code=True
-)
+train_split = config.get("train_split", "train[:100]")
+eval_split = config.get("eval_split", "validation[:100]")
+train_dataset = load_dataset("hellaswag", split=train_split, trust_remote_code=True)
+eval_dataset = load_dataset("hellaswag", split=eval_split, trust_remote_code=True)
 
 
 def preprocess_function(example):
