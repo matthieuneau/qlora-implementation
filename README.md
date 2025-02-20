@@ -59,11 +59,9 @@ In full fine-tuning, all model parameters were updated. This provides the highes
 
 ## Evaluation
 
-The fine-tuned models were evaluated on **lm-harness-evaluation**, a framework that measures language model performance across tasks. The results compared:
+The fine-tuned models were evaluated using **lm-harness-evaluation**, a framework that measures language model performance across tasks.
 
-- **Accuracy** on multiple-choice questions
-- **Perplexity** (lower is better)
-- **Computational efficiency** (GPU memory usage, speed)
+The task chosen was the hellaswag benchmark
 
 ## Results & Observations
 
