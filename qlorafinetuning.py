@@ -140,4 +140,5 @@ trainer = Trainer(
 
 trainer.train()
 
-# No need to merge model with QLoRA
+model.merge_and_unload()
+model.save_pretrained(config.get("output_dir", "./qlora"))
