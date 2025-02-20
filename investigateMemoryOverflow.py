@@ -1,4 +1,5 @@
 import torch
+from torch.utils.data import DataLoader
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -9,9 +10,9 @@ from transformers import (
     TrainerCallback,
 )
 
-import wandb
-
-wandb.init(project="qlora")
+# import wandb
+#
+# wandb.init(project="qlora")
 
 # model_id = "meta-llama/Llama-3.2-1B"
 model_id = "HuggingFaceTB/SmolLM2-135M"
@@ -66,45 +67,9 @@ eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labe
 
 # Data collator for efficient padding
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
-# dataloader = DataLoader(train_dataset, batch_size=2, collate_fn=data_collator)
-# batch = next(iter(dataloader))
-#
+dataloader = DataLoader(train_dataset, batch_size=4, collate_fn=data_collator)
+batch = next(iter(dataloader))
+
 # print("processed dataset sample", batch)
-#
-training_args = TrainingArguments(
-    output_dir="./results",
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,  # Adjust for GPU memory
-    learning_rate=2e-5,
-    weight_decay=0.01,
-    logging_dir="./logs",
-    save_strategy="epoch",
-    eval_strategy="epoch",
-    fp16=False,
-    bf16=True,
-    bf16_full_eval=True,  # Ensure bf16 is used in evaluation
-    num_train_epochs=5,
-    report_to="wandb",
-)
-
-
-class MemoryUsageCallback(TrainerCallback):
-    def on_step_end(self, args, state, control, **kwargs):
-        allocated = torch.cuda.memory_allocated() / 1e6  # Convert to MB
-        reserved = torch.cuda.memory_reserved() / 1e6  # Convert to MB
-        print(
-            f"[Step {state.global_step}] Allocated: {allocated:.2f} MB | Cached: {reserved:.2f} MB"
-        )
-
-
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    eval_dataset=eval_dataset,
-    train_dataset=train_dataset,
-    processing_class=tokenizer,
-    data_collator=data_collator,
-    callbacks=[MemoryUsageCallback()],
-)
-
-trainer.train()
+for key, value in batch.items():
+    print(f"{key}: shape={value.shape}, dtype={value.dtype}")

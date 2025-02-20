@@ -6,18 +6,36 @@ from transformers import (
     DataCollatorForSeq2Seq,
     Trainer,
     TrainingArguments,
-    TrainerCallback,
 )
-
+from peft import LoraConfig, get_peft_model
+from transformers import BitsAndBytesConfig
 import wandb
 
 wandb.init(project="qlora")
 
-# model_id = "meta-llama/Llama-3.2-1B"
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",  # Normalized float-4 (better for QLoRA)
+    bnb_4bit_compute_dtype=torch.bfloat16,  # Computation in bf16
+)
+
 model_id = "HuggingFaceTB/SmolLM2-135M"
 model = AutoModelForCausalLM.from_pretrained(
-    model_id, torch_dtype=torch.bfloat16, device_map=0
+    model_id,
+    quantization_config=bnb_config,  # Use QLoRA 4-bit quantization
+    device_map="auto",
 )
+
+lora_config = LoraConfig(
+    r=8,
+    lora_alpha=32,
+    lora_dropout=0.1,
+    target_modules=["q_proj", "v_proj"],
+    bias="none",  # No bias needed for QLoRA
+    task_type="CAUSAL_LM",  # Specify task type
+)
+
+model = get_peft_model(model, lora_config)
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.pad_token = tokenizer.eos_token
@@ -39,7 +57,6 @@ def preprocess_function(example):
         f"Answer: "
     )
 
-    # Map label index (0-3) to corresponding letter
     correct_choice = ["A", "B", "C", "D"][int(example["label"])]
 
     tokenized = tokenizer(
@@ -49,7 +66,6 @@ def preprocess_function(example):
         return_tensors="pt",
     )
 
-    # Remove extra dimension to avoid nested lists
     return {
         "input_ids": tokenized["input_ids"].squeeze(0).tolist(),
         "attention_mask": tokenized["attention_mask"].squeeze(0).tolist(),
@@ -62,49 +78,34 @@ train_dataset = train_dataset.select_columns(["input_ids", "attention_mask", "la
 eval_dataset = eval_dataset.map(preprocess_function, batched=False)
 eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labels"])
 
-# print("tokenized dataset sample", train_dataset[0])
-
-# Data collator for efficient padding
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
-# dataloader = DataLoader(train_dataset, batch_size=2, collate_fn=data_collator)
-# batch = next(iter(dataloader))
-#
-# print("processed dataset sample", batch)
-#
+
 training_args = TrainingArguments(
-    output_dir="./results",
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,  # Adjust for GPU memory
-    learning_rate=2e-5,
+    output_dir="./results_qlora",
+    per_device_train_batch_size=32,
+    gradient_accumulation_steps=4,
+    learning_rate=2e-4,  # Higher LR for LoRA/QLoRA
     weight_decay=0.01,
     logging_dir="./logs",
     save_strategy="epoch",
+    save_total_limit=1,
     eval_strategy="epoch",
     fp16=False,
-    bf16=True,
-    bf16_full_eval=True,  # Ensure bf16 is used in evaluation
-    num_train_epochs=5,
+    bf16=True,  # Use bf16 for QLoRA training
+    bf16_full_eval=True,
+    num_train_epochs=3,
     report_to="wandb",
 )
-
-
-class MemoryUsageCallback(TrainerCallback):
-    def on_step_end(self, args, state, control, **kwargs):
-        allocated = torch.cuda.memory_allocated() / 1e6  # Convert to MB
-        reserved = torch.cuda.memory_reserved() / 1e6  # Convert to MB
-        print(
-            f"[Step {state.global_step}] Allocated: {allocated:.2f} MB | Cached: {reserved:.2f} MB"
-        )
-
 
 trainer = Trainer(
     model=model,
     args=training_args,
-    eval_dataset=eval_dataset,
     train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
     processing_class=tokenizer,
     data_collator=data_collator,
-    callbacks=[MemoryUsageCallback()],
 )
 
 trainer.train()
+
+# No need to merge model with QLoRA
