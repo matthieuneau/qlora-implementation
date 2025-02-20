@@ -9,10 +9,18 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model
 import wandb
+import yaml
+
+config_file = "config.yaml"
+try:
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+except FileNotFoundError:
+    config = {}
 
 wandb.init(project="qlora")
 
-model_id = "HuggingFaceTB/SmolLM2-135M"
+model_id = config.get("model_id", "HuggingFaceTB/SmolLM2-135M")
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
     # load_in_4bit=True,  # Use 4-bit quantization for efficient training
@@ -74,21 +82,22 @@ eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labe
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
 
 training_args = TrainingArguments(
-    output_dir="./results_lora",
-    per_device_train_batch_size=32,
-    gradient_accumulation_steps=4,
-    learning_rate=2e-4,  # Higher LR for LoRA
-    weight_decay=0.01,
-    logging_dir="./logs",
-    save_strategy="epoch",
-    save_total_limit=1,  # only save last epoch
-    eval_strategy="epoch",
-    fp16=False,
-    bf16=True,
-    bf16_full_eval=True,
-    num_train_epochs=3,
-    report_to="wandb",
+    output_dir=config.get("output_dir", "./results"),
+    per_device_train_batch_size=config.get("batch_size", 1),
+    gradient_accumulation_steps=config.get("gradient_accumulation_steps", 4),
+    learning_rate=2e-4,  # Higher lr for lora
+    weight_decay=config.get("weight_decay", 0.01),
+    logging_dir=config.get("logging_dir", "./logs"),
+    save_strategy=config.get("save_strategy", "epoch"),
+    save_total_limit=config.get("save_total_limit", 1),
+    eval_strategy=config.get("eval_strategy", "epoch"),
+    fp16=config.get("fp16", False),
+    bf16=config.get("bf16", True),
+    bf16_full_eval=config.get("bf16_full_eval", True),
+    num_train_epochs=config.get("num_train_epochs", 5),
+    report_to=config.get("report_to", "wandb"),
 )
+
 
 trainer = Trainer(
     model=model,

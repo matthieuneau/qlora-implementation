@@ -21,8 +21,7 @@ try:
 except FileNotFoundError:
     config = {}
 
-# model_id = "meta-llama/Llama-3.2-1B"
-model_id = "HuggingFaceTB/SmolLM2-135M"
+model_id = config.get("model_id", "HuggingFaceTB/SmolLM2-135M")
 model = AutoModelForCausalLM.from_pretrained(
     model_id, torch_dtype=torch.bfloat16, device_map=0
 )
@@ -72,7 +71,8 @@ eval_dataset = eval_dataset.select_columns(["input_ids", "attention_mask", "labe
 
 # print("tokenized dataset sample", train_dataset[0])
 
-# Load training arguments from config or use defaults
+data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
+
 training_args = TrainingArguments(
     output_dir=config.get("output_dir", "./results"),
     per_device_train_batch_size=config.get("batch_size", 1),
@@ -81,6 +81,7 @@ training_args = TrainingArguments(
     weight_decay=config.get("weight_decay", 0.01),
     logging_dir=config.get("logging_dir", "./logs"),
     save_strategy=config.get("save_strategy", "epoch"),
+    save_total_limit=config.get("save_total_limit", 1),
     eval_strategy=config.get("eval_strategy", "epoch"),
     fp16=config.get("fp16", False),
     bf16=config.get("bf16", True),
@@ -91,12 +92,24 @@ training_args = TrainingArguments(
 
 
 class MemoryUsageCallback(TrainerCallback):
-    def on_step_end(self, args, state, control, **kwargs):
-        allocated = torch.cuda.memory_allocated() / 1e6  # Convert to MB
-        reserved = torch.cuda.memory_reserved() / 1e6  # Convert to MB
+    def log_memory(self, event_name, state):
+        allocated = torch.cuda.memory_allocated() / 1e6
+        reserved = torch.cuda.memory_reserved() / 1e6
         print(
-            f"[Step {state.global_step}] Allocated: {allocated:.2f} MB | Cached: {reserved:.2f} MB"
+            f"[{event_name} - Step {state.global_step}] Allocated: {allocated:.2f} MB | Cached: {reserved:.2f} MB"
         )
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        self.log_memory("on_train_begin", state)
+
+    def on_step_begin(self, args, state, control, **kwargs):
+        self.log_memory("on_step_begin", state)
+
+    def on_step_end(self, args, state, control, **kwargs):
+        self.log_memory("on_step_end", state)
+
+    def on_train_end(self, args, state, control, **kwargs):
+        self.log_memory("on_train_end", state)
 
 
 trainer = Trainer(
